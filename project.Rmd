@@ -1,0 +1,107 @@
+---
+title: "Project 3"
+Author :  "Kirath Singh"
+output: html_notebook
+---
+
+#The dataset i have used for this project is the titanic dataset.
+
+The sinking of the Titanic is one of the most infamous shipwrecks in history.
+
+On April 15, 1912, during her maiden voyage, the widely considered “unsinkable” RMS Titanic sank after colliding with an iceberg. Unfortunately, there weren’t enough lifeboats for everyone onboard, resulting in the death of 1502 out of 2224 passengers and crew.
+
+While there was some element of luck involved in surviving, it seems some groups of people were more likely to survive than others.
+
+In this analysis we will be using binary classification to predict the survival varibale for a variety of passenegers depending on their age,sex
+
+```{r}
+library(ROCR)
+df<-read.csv("titanic.csv",header=TRUE)
+head(df)
+```
+
+#Data cleaning and preprocessing
+Removing futile columns from the datset like name,fare,passengerid,etc.
+
+```{r}
+dftr<-subset(df,select=-c(Ticket,Cabin,PassengerId,Name,Fare))
+dftr<-dftr[!(is.na(dftr$Embarked)|dftr$Embarked==""),]
+dftr<-dftr[!(is.na(dftr$Age)|dftr$Age==""),]
+nrow(dftr)
+library(Hmisc)
+describe(dftr)
+```
+```{r}
+set.seed(2)
+tr<-sample(1:nrow(dftr),500)
+ts<-tr
+```
+
+#Dividing the dataset into testing and training dataset
+
+The training dataset contains 500 rows while the test dataset contains (712-500)=212 rows
+Hence the ratio of training to test  dataset is roughly 70:30
+
+```{r}
+training<-dftr[tr,]
+test<-dftr[ts,]
+
+```
+#Modelling the logistic regression , with Survived as the dependent variable or the label that has to be predicted 
+Logistic Regression is a Machine Learning classification algorithm that is used to predict the probability of a categorical dependent variable. In logistic regression, the dependent variable is a binary variable that contains data coded as 1 (yes, success, etc.) or 0 (no, failure, etc.). In other words, the logistic regression model predicts P(Y=1) as a function of X.
+
+It is genrally preferred over other machine learning algorithms when the dependent variable is categorical.
+
+The equation of logit
+
+Logit = Log (p/1-p) = log (probability of event happening/ probability of event not happening) = log (Odds)
+
+Printing the summary of the logisitc regression model
+```{r}
+modellog<-glm(formula=Survived~.,family=binomial(link="logit"),data=training)
+summary(modellog)
+```
+
+#   Insights from the logistic regression model
+
+Chances of survival decreases by a coefficent of -2.55 for males
+
+The AIC value for this particular dataset was the lowest for Logistic regression as compared to other classfication models like random forest, decision tree, Support vector machine and xgboost
+```{r}
+result<-predict(modellog,test,type='response')
+result<-ifelse(result>0.5,1,0)
+ClassificationError<-mean(result!=test$Survived)
+print(paste('Model Accuracy ',1-ClassificationError))
+```
+
+#Confusion Matrix for the dataset
+
+```{r}
+table(test$Survived,result)
+```
+```{r}
+result2<-predict(modellog,test,type="response")
+pr<-prediction(result2,test$Survived)
+prf<-performance(pr,measure="tpr",x.measure="fpr")
+plot(prf)
+```
+```{r}
+PredictSurvival<-function(inputdata,threshold)
+{
+  result<-predict(modellog,inputdata)
+  result<-ifelse(result>threshold,1,0)
+}
+```
+
+
+
+```{r}
+print(PredictSurvival(test,0.5))
+table(test$Survived,PredictSurvival(test,0.5))
+table(test$Survived,PredictSurvival(test,0.75))
+```
+
+#Caase where the logistic regresion model can fail
+
+Logistic Regression only estimates a linear boundary. So, when there is non-linear separation of labels, Logistic regression will fail badly.
+If there are multiple "easy to classify" datapoints that are far away from the decision boundary, then they will distort the decision boundary which will make "wrong classifications" from datapoints that are quite close to the decision boundary. Which will in turn make the decision boundary non-linear and thus the model will get overtrained
